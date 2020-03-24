@@ -18,7 +18,7 @@ const (
 	BR = 3
 )
 
-// QuadTree represents the quardtree information
+// QuadTree keeps the information of the tree
 type QuadTree struct {
 	MaxWidth  int
 	MaxHeight int
@@ -45,36 +45,6 @@ func (tree *QuadTree) BuildTree(imageData image.Image) {
 	xStart, yStart := minBound.X, minBound.Y
 	tree.root = buildTree(imageData, xStart, yStart, tree.MaxWidth, tree.MaxHeight)
 	// tree.colorMap = buildColorAccumulation(imageData, tree.MaxWidth, tree.MaxHeight)
-}
-
-// TODO : incomplete
-func buildColorAccumulation(imageData image.Image, width, height int) [][]color.Color {
-
-	colorMap := make([][]color.Color, height)
-	for i := range colorMap {
-		colorMap[i] = make([]color.Color, width)
-	}
-
-	colorMap[0][0] = imageData.At(0, 0)
-
-	// the first row
-	for i := 1; i < width; i++ {
-		// colorMap[0][i] = colorMap[0][i-1] + imageData.At(i, 0)
-	}
-
-	// the first column
-	for j := 1; j < height; j++ {
-		// colorMap[j][0] = colorMap[j-1][0] + imageData.At(0, j)
-	}
-
-	// the rest
-	for j := 1; j < height; j++ {
-		for i := 1; i < width; i++ {
-			// colorMap[j][i] = imageData.At(i, j) - colorMap[j-1][i] - colorMap[j][i-1] + colorMap[j-1][i-1]
-		}
-	}
-
-	return colorMap
 }
 
 func calculateDiff(median float64) func(uint8) float64 {
@@ -161,13 +131,12 @@ func buildTree(imageData image.Image, x, y, width, height int) *treeNode {
 	return &node
 }
 
-// TODO: build a DP map for color
-
 // For testing
 func printInfo(node *treeNode) {
 	fmt.Printf("x: %d, y: %d, w: %d, h: %d, c: %d, diff: %f\n", node.x, node.y, node.width, node.height, node.color, node.diff)
 }
 
+// Traversal goes through each node with a selected algorithm
 func (tree *QuadTree) Traversal() {
 
 	traversalAlgo := treeTraversalLevelOrder
@@ -227,9 +196,9 @@ func setImageBuffer(node *treeNode, imageBuffer *image.NRGBA) {
 // CreateImages : Create images based of the result in the QuadTree
 // stepCount : number of steps before stop
 // isAnimated : true means create a series of images, false will only create the last result
-func (tree *QuadTree) CreateImages(stepCount int, isAnimated bool) []image.Image {
+func (tree *QuadTree) CreateImages(count int, isAnimated bool) []image.Image {
 
-	if stepCount <= 0 {
+	if count <= 0 {
 		return nil
 	}
 
@@ -241,7 +210,7 @@ func (tree *QuadTree) CreateImages(stepCount int, isAnimated bool) []image.Image
 	pq := BuildPQ()
 	heap.Push(&pq, tree.root)
 
-	for pq.Len() > 0 && stepCount > 0 {
+	for pq.Len() > 0 && count > 0 {
 		currentNode := heap.Pop(&pq).(*treeNode)
 
 		// printInfo(currentNode)
@@ -254,7 +223,7 @@ func (tree *QuadTree) CreateImages(stepCount int, isAnimated bool) []image.Image
 			result = append(result, currentImage)
 		}
 
-		stepCount--
+		count--
 
 		for _, child := range currentNode.quadrant {
 			if child != nil {
@@ -268,4 +237,33 @@ func (tree *QuadTree) CreateImages(stepCount int, isAnimated bool) []image.Image
 	}
 
 	return result
+}
+
+// TODO : incomplete, build a DP map for color
+func buildColorAccumulation(imageData image.Image, width, height int) [][]color.Color {
+
+	colorMap := make([][]color.Color, height)
+	for i := range colorMap {
+		colorMap[i] = make([]color.Color, width)
+	}
+
+	colorMap[0][0] = imageData.At(0, 0)
+
+	// the first row
+	for i := 1; i < width; i++ {
+		// colorMap[0][i] = colorMap[0][i-1] + imageData.At(i, 0)
+	}
+
+	// the first column
+	for j := 1; j < height; j++ {
+		// colorMap[j][0] = colorMap[j-1][0] + imageData.At(0, j)
+	}
+
+	// the rest
+	for j := 1; j < height; j++ {
+		for i := 1; i < width; i++ {
+			// colorMap[j][i] = imageData.At(i, j) - colorMap[j-1][i] - colorMap[j][i-1] + colorMap[j-1][i-1]
+		}
+	}
+	return colorMap
 }

@@ -31,6 +31,7 @@ func (pq *PriorityQueue) Pop() interface{} {
 	return item
 }
 
+// BuildPQ initializes the priority queue and returns it
 func BuildPQ() PriorityQueue {
 	pq := make(PriorityQueue, 0)
 	heap.Init(&pq)
