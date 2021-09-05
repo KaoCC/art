@@ -1,3 +1,3 @@
 module github.com/kaocc/art
 
-go 1.15
+go 1.17

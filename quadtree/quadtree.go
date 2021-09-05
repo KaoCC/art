@@ -44,7 +44,6 @@ func (tree *QuadTree) BuildTree(imageData image.Image) {
 
 	xStart, yStart := minBound.X, minBound.Y
 	tree.root = buildTree(imageData, xStart, yStart, tree.MaxWidth, tree.MaxHeight)
-	// tree.colorMap = buildColorAccumulation(imageData, tree.MaxWidth, tree.MaxHeight)
 }
 
 func calculateDiff(median float64) func(uint8) float64 {
@@ -212,8 +211,6 @@ func (tree *QuadTree) CreateImages(count int, isAnimated bool) []image.Image {
 
 	for pq.Len() > 0 && count > 0 {
 		currentNode := heap.Pop(&pq).(*treeNode)
-
-		// printInfo(currentNode)
 		setImageBuffer(currentNode, imageBuffer)
 
 		// write to a new image and append the result to the list
@@ -237,33 +234,4 @@ func (tree *QuadTree) CreateImages(count int, isAnimated bool) []image.Image {
 	}
 
 	return result
-}
-
-// TODO : incomplete, build a DP map for color
-func buildColorAccumulation(imageData image.Image, width, height int) [][]color.Color {
-
-	colorMap := make([][]color.Color, height)
-	for i := range colorMap {
-		colorMap[i] = make([]color.Color, width)
-	}
-
-	colorMap[0][0] = imageData.At(0, 0)
-
-	// the first row
-	for i := 1; i < width; i++ {
-		// colorMap[0][i] = colorMap[0][i-1] + imageData.At(i, 0)
-	}
-
-	// the first column
-	for j := 1; j < height; j++ {
-		// colorMap[j][0] = colorMap[j-1][0] + imageData.At(0, j)
-	}
-
-	// the rest
-	for j := 1; j < height; j++ {
-		for i := 1; i < width; i++ {
-			// colorMap[j][i] = imageData.At(i, j) - colorMap[j-1][i] - colorMap[j][i-1] + colorMap[j-1][i-1]
-		}
-	}
-	return colorMap
 }
