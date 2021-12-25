@@ -1,31 +1,30 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/kaocc/art/quadtree"
-	// "github.com/pkg/profile"
-
-	"flag"
 )
 
 func main() {
 
-	/// CPU profiling
-	// defer profile.Start().Stop()
-
 	const defaultFile = "tux.jpg"
 	const defaultSteps = 100
-	fileName := defaultFile
-	numSteps := 300
-	isAnimated := false
-	flag.StringVar(&fileName, "file", defaultFile, "The path to the target file")
-	flag.IntVar(&numSteps, "step", defaultSteps, "Number of steps before stop")
-	flag.BoolVar(&isAnimated, "animate", false, "Set to create an animated gif")
-	helpFlag := flag.Bool("help", false, "Show usage")
+
+	var fileName string
+	var numSteps uint
+	var isAnimated bool
+	var samplePeriod uint
+
+	flag.StringVar(&fileName, "file", defaultFile, "The path to the target file.")
+	flag.UintVar(&numSteps, "step", defaultSteps, "Number of steps before stop.")
+	flag.BoolVar(&isAnimated, "animate", false, "Set to create an animated gif.")
+	flag.UintVar(&samplePeriod, "period", 20, "The sample period. When animate flag is set, draw the result every n frame.")
+	helpFlag := flag.Bool("help", false, "Show usage.")
 
 	flag.Parse()
 
@@ -46,16 +45,22 @@ func main() {
 	qtree.BuildTree(inputImage)
 
 	log.Printf("Create Images\n")
-	frames := qtree.CreateImages(numSteps, isAnimated)
+	frames := qtree.CreateImages(numSteps, isAnimated, samplePeriod)
 
 	log.Printf("Output Images\n")
-
 	outputFileName := strings.TrimSuffix(fileName, filepath.Ext(fileName))
-	WriteImage(outputFileName+"_final.jpg", frames[len(frames)-1])
-
-	if isAnimated {
-		frames = append(frames, inputImage)
-		WriteGif(outputFileName+"_animated.gif", frames)
+	err = WriteImage(outputFileName+"_final.jpg", frames[len(frames)-1])
+	if err != nil {
+		log.Fatal(err)
 	}
 
+	if isAnimated {
+		log.Printf("Output Animated\n")
+		frames = append(frames, inputImage)
+		if err := WriteGif(outputFileName+"_animated.gif", frames); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	log.Printf("Done\n")
 }

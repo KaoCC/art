@@ -8,4 +8,5 @@ The algorithm builds a Quadtree by recursively dividing the image into four subi
 Later a priority queue is utilized along with a traversal algorithm to decide which node should be processed and animated first based on the related deviation.
 
 
-![](lena_animated.gif)
+![](lenna_animated.gif)
+![](ckao_animated.gif)

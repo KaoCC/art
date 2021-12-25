@@ -7,7 +7,6 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
-	"math"
 )
 
 // Top Left, Top Right, Bottom Left, Bottom Right
@@ -23,7 +22,6 @@ type QuadTree struct {
 	MaxWidth  int
 	MaxHeight int
 	root      *treeNode
-	colorMap  [][]color.Color
 }
 
 type treeNode struct {
@@ -46,13 +44,14 @@ func (tree *QuadTree) BuildTree(imageData image.Image) {
 	tree.root = buildTree(imageData, xStart, yStart, tree.MaxWidth, tree.MaxHeight)
 }
 
-func calculateDiff(median float64) func(uint8) float64 {
-	return func(c uint8) float64 {
-		return math.Abs(float64(c) - median)
+func calculateDiff(median float64) func(uint32) float64 {
+	return func(c uint32) float64 {
+		diff := float64(c) - median
+		return diff * diff
 	}
 }
 
-func convertColor(c uint8) float64 {
+func convertColor(c uint32) float64 {
 	return float64(c)
 }
 
@@ -63,22 +62,22 @@ func averageColor(sumR, sumG, sumB, sumA float64, width, height int) color.Color
 	sumB /= area
 	sumA /= area
 
-	return color.NRGBA{R: uint8(sumR), G: uint8(sumG), B: uint8(sumB), A: uint8(sumA)}
+	return color.NRGBA64{R: uint16(sumR), G: uint16(sumG), B: uint16(sumB), A: uint16(sumA)}
 }
 
-func accumulate(imageData image.Image, x, y, width, height int, opR, opG, opB, opA func(uint8) float64) (float64, float64, float64, float64) {
+func accumulate(imageData image.Image, x, y, width, height int, opR, opG, opB, opA func(uint32) float64) (float64, float64, float64, float64) {
 
 	var sumR, sumG, sumB, sumA float64
 	for j := y; j < y+height; j++ {
 		for i := x; i < x+width; i++ {
 
 			pixel := imageData.At(i, j)
-			currentColor := color.NRGBAModel.Convert(pixel).(color.NRGBA)
+			r, g, b, a := pixel.RGBA()
 
-			sumR += opR(currentColor.R)
-			sumG += opG(currentColor.G)
-			sumB += opB(currentColor.B)
-			sumA += opA(currentColor.A)
+			sumR += opR(r)
+			sumG += opG(g)
+			sumB += opB(b)
+			sumA += opA(a)
 		}
 	}
 
@@ -88,6 +87,7 @@ func accumulate(imageData image.Image, x, y, width, height int, opR, opG, opB, o
 func buildTree(imageData image.Image, x, y, width, height int) *treeNode {
 
 	node := treeNode{x: x, y: y, width: width, height: height}
+	area := float64(width * height)
 
 	if width == 1 || height == 1 {
 
@@ -97,9 +97,9 @@ func buildTree(imageData image.Image, x, y, width, height int) *treeNode {
 
 		// calculate the color diff
 		diffR, diffG, diffB, diffA := accumulate(imageData, x, y, width, height,
-			calculateDiff(sumR), calculateDiff(sumG), calculateDiff(sumB), calculateDiff(sumA))
+			calculateDiff(sumR/area), calculateDiff(sumG/area), calculateDiff(sumB/area), calculateDiff(sumA/area))
 
-		node.diff = (diffR + diffG + diffB + diffA) / float64(width*height)
+		node.diff = (diffR + diffG + diffB + diffA) / area
 		return &node
 	}
 
@@ -113,20 +113,20 @@ func buildTree(imageData image.Image, x, y, width, height int) *treeNode {
 
 	var sumR, sumG, sumB, sumA float64
 	for _, child := range node.quadrant {
-		currentColor := color.NRGBAModel.Convert(child.color).(color.NRGBA)
+		r, g, b, a := child.color.RGBA()
 		childArea := uint32(child.width * child.height)
-		sumR += float64(uint32(currentColor.R) * childArea)
-		sumG += float64(uint32(currentColor.G) * childArea)
-		sumB += float64(uint32(currentColor.B) * childArea)
-		sumA += float64(uint32(currentColor.A) * childArea)
+		sumR += float64(uint32(r) * childArea)
+		sumG += float64(uint32(g) * childArea)
+		sumB += float64(uint32(b) * childArea)
+		sumA += float64(uint32(a) * childArea)
 	}
 
 	node.color = averageColor(sumR, sumG, sumB, sumA, width, height)
 
 	diffR, diffG, diffB, diffA := accumulate(imageData, x, y, width, height,
-		calculateDiff(sumR), calculateDiff(sumG), calculateDiff(sumB), calculateDiff(sumA))
+		calculateDiff(sumR/area), calculateDiff(sumG/area), calculateDiff(sumB/area), calculateDiff(sumA/area))
 
-	node.diff = (diffR + diffG + diffB + diffA) / float64(width*height)
+	node.diff = (diffR + diffG + diffB + diffA) / area
 	return &node
 }
 
@@ -184,7 +184,7 @@ func treeTraversalLevelOrder(node *treeNode, visit func(node *treeNode)) {
 
 }
 
-func setImageBuffer(node *treeNode, imageBuffer *image.NRGBA) {
+func setImageBuffer(node *treeNode, imageBuffer *image.NRGBA64) {
 	for j := node.y; j < node.y+node.height; j++ {
 		for i := node.x; i < node.x+node.width; i++ {
 			(*imageBuffer).Set(i, j, node.color)
@@ -193,34 +193,37 @@ func setImageBuffer(node *treeNode, imageBuffer *image.NRGBA) {
 }
 
 // CreateImages : Create images based of the result in the QuadTree
-// stepCount : number of steps before stop
-// isAnimated : true means create a series of images, false will only create the last result
-func (tree *QuadTree) CreateImages(count int, isAnimated bool) []image.Image {
+// count : Number of steps before stop
+// isAnimated : True means create a series of images, false will only create the final result
+// samplePeriod: The sample period. When animate flag is set, draw the result every n frame.
+func (tree *QuadTree) CreateImages(count uint, isAnimated bool, samplePeriod uint) []image.Image {
 
-	if count <= 0 {
+	if count == 0 || samplePeriod == 0 {
 		return nil
 	}
 
-	outputBound := image.Rect(0, 0, int(tree.MaxWidth), int(tree.MaxHeight))
-	imageBuffer := image.NewNRGBA(outputBound)
+	outputBound := image.Rect(0, 0, tree.MaxWidth, tree.MaxHeight)
+	imageBuffer := image.NewNRGBA64(outputBound)
 
 	result := make([]image.Image, 0)
 
 	pq := BuildPQ()
 	heap.Push(&pq, tree.root)
 
-	for pq.Len() > 0 && count > 0 {
+	sample := uint(0)
+
+	for pq.Len() > 0 && sample < count {
 		currentNode := heap.Pop(&pq).(*treeNode)
 		setImageBuffer(currentNode, imageBuffer)
 
 		// write to a new image and append the result to the list
-		if isAnimated {
-			currentImage := image.NewNRGBA(outputBound)
+		if isAnimated && sample%samplePeriod == 0 {
+			currentImage := image.NewNRGBA64(outputBound)
 			draw.Draw(currentImage, currentImage.Bounds(), imageBuffer, image.ZP, draw.Src)
 			result = append(result, currentImage)
 		}
 
-		count--
+		sample++
 
 		for _, child := range currentNode.quadrant {
 			if child != nil {

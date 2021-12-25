@@ -7,6 +7,7 @@ import (
 	"image/gif"
 	"image/jpeg"
 	_ "image/jpeg"
+	_ "image/png"
 	"os"
 )
 
