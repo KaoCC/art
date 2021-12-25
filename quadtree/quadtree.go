@@ -44,9 +44,9 @@ func (tree *QuadTree) BuildTree(imageData image.Image) {
 	tree.root = buildTree(imageData, xStart, yStart, tree.MaxWidth, tree.MaxHeight)
 }
 
-func calculateDiff(median float64) func(uint32) float64 {
+func calculateDiff(mean float64) func(uint32) float64 {
 	return func(c uint32) float64 {
-		diff := float64(c) - median
+		diff := float64(c) - mean
 		return diff * diff
 	}
 }
@@ -99,7 +99,7 @@ func buildTree(imageData image.Image, x, y, width, height int) *treeNode {
 		diffR, diffG, diffB, diffA := accumulate(imageData, x, y, width, height,
 			calculateDiff(sumR/area), calculateDiff(sumG/area), calculateDiff(sumB/area), calculateDiff(sumA/area))
 
-		node.diff = (diffR + diffG + diffB + diffA) / area
+		node.diff = diffR + diffG + diffB + diffA
 		return &node
 	}
 
@@ -126,7 +126,8 @@ func buildTree(imageData image.Image, x, y, width, height int) *treeNode {
 	diffR, diffG, diffB, diffA := accumulate(imageData, x, y, width, height,
 		calculateDiff(sumR/area), calculateDiff(sumG/area), calculateDiff(sumB/area), calculateDiff(sumA/area))
 
-	node.diff = (diffR + diffG + diffB + diffA) / area
+	// Note: We want to take the area into consideration so we do not divide it here.
+	node.diff = diffR + diffG + diffB + diffA
 	return &node
 }
 
